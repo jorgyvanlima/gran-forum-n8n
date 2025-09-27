@@ -1,0 +1,53 @@
+{
+  "name": "WhatsApp Inbound (POST /webhook/whatsapp-in)",
+  "nodes": [
+    {
+      "parameters": { "path": "whatsapp-in", "httpMethod": "POST", "responseMode": "responseNode", "options": { "responseCode": 200 } },
+      "id": "Webhook_In",
+      "name": "Webhook - whatsapp-in (POST)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [-680, 20]
+    },
+    {
+      "parameters": {
+        "functionCode": "const item = items[0].json;\nconst body = item.body || {};\nconst entry = (body.entry || [])[0] || {};\nconst change = (entry.changes || [])[0] || {};\nconst value = change.value || {};\nconst msg = (value.messages || [])[0] || {};\nconst from = msg.from ? String(msg.from) : '';\nconst text = (msg.text && msg.text.body) ? String(msg.text.body) : (msg.type === 'text' && msg.body ? String(msg.body) : '');\nlet threadId = '';\nconst m = text.match(/\\[#thr_([A-Za-z0-9_-]+)\\]/);\nif (m) threadId = m[1];\nif (!threadId && item.query && item.query.threadId) threadId = String(item.query.threadId);\nif (!from || !text) { return []; }\nreturn [{ json: { threadId, authorPhone: from.startsWith('+') ? from : ('+' + from), text } }];\n"
+      },
+      "id": "Fn_Parse",
+      "name": "Code - parse inbound",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [-430, 20]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:3001/api/webhooks/whatsapp",
+        "jsonParameters": true,
+        "responseFormat": "json",
+        "options": { "timeout": 30000 },
+        "bodyParametersJson": "{\n  \"threadId\": \"={{$json.threadId}}\",\n  \"authorPhone\": \"={{$json.authorPhone}}\",\n  \"text\": \"={{$json.text}}\"\n}"
+      },
+      "id": "HTTP_Backend",
+      "name": "HTTP Request - Backend /api/webhooks/whatsapp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [-180, 20]
+    },
+    {
+      "parameters": { "responseBody": "OK", "responseCode": 200, "responseData": "text" },
+      "id": "Respond_OK_In",
+      "name": "Respond 200 (OK)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [70, 20]
+    }
+  ],
+  "connections": {
+    "Webhook - whatsapp-in (POST)": { "main": [[{ "node": "Code - parse inbound", "type": "main", "index": 0 }]] },
+    "Code - parse inbound": { "main": [[{ "node": "HTTP Request - Backend /api/webhooks/whatsapp", "type": "main", "index": 0 }]] },
+    "HTTP Request - Backend /api/webhooks/whatsapp": { "main": [[{ "node": "Respond 200 (OK)", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "timezone": "America/Belem" }
+}

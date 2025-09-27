@@ -1,0 +1,52 @@
+{
+  "name": "WhatsApp Verify (GET /webhook/whatsapp-in)",
+  "nodes": [
+    {
+      "parameters": { "path": "whatsapp-in", "httpMethod": "GET", "responseMode": "responseNode" },
+      "id": "Webhook_Verify",
+      "name": "Webhook - whatsapp-in (GET)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [-600, 120]
+    },
+    {
+      "parameters": {
+        "conditions": { "string": [
+          { "value1": "={{$json[\"query\"][\"hub.verify_token\"]}}", "operation": "equal", "value2": "SEU_VERIFY_TOKEN" }
+        ]}
+      },
+      "id": "IF_Token",
+      "name": "IF - check token",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-320, 120]
+    },
+    {
+      "parameters": { "responseBody": "={{$json[\"query\"][\"hub.challenge\"]}}", "responseCode": 200, "responseData": "text" },
+      "id": "Respond_OK",
+      "name": "Respond 200 (challenge)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [-60, 20]
+    },
+    {
+      "parameters": { "responseBody": "Invalid verify token", "responseCode": 403, "responseData": "text" },
+      "id": "Respond_403",
+      "name": "Respond 403",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [-60, 220]
+    }
+  ],
+  "connections": {
+    "Webhook - whatsapp-in (GET)": { "main": [[{ "node": "IF - check token", "type": "main", "index": 0 }]] },
+    "IF - check token": {
+      "main": [
+        [{ "node": "Respond 200 (challenge)", "type": "main", "index": 0 }],
+        [{ "node": "Respond 403", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": { "timezone": "America/Belem" }
+}

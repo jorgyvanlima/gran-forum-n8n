@@ -1,0 +1,60 @@
+{
+  "name": "Send WhatsApp (POST /webhook/send-whatsapp)",
+  "nodes": [
+    {
+      "parameters": { "path": "send-whatsapp", "httpMethod": "POST", "responseMode": "onReceived", "options": { "responseCode": 200 } },
+      "id": "Webhook_Send",
+      "name": "Webhook - send-whatsapp",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [-620, 0]
+    },
+    {
+      "parameters": {
+        "functionCode": "const input = items[0]?.json || {};\nconst phones = Array.isArray(input.phones) ? input.phones : [];\nconst text = String(input.text || '');\nreturn phones.map(p => ({ json: { phone: p, text } }));\n"
+      },
+      "id": "Fn_Split",
+      "name": "Code - split phones",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [-350, 0]
+    },
+    {
+      "parameters": {
+        "keepOnlySet": false,
+        "values": { "string": [
+          { "name": "PHONE_NUMBER_ID", "value": "SEU_PHONE_NUMBER_ID" },
+          { "name": "TOKEN", "value": "SEU_TOKEN_WABA" }
+        ]}
+      },
+      "id": "Set_Config",
+      "name": "Set Config (PHONE_NUMBER_ID/TOKEN)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [-120, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v20.0/{{$json.PHONE_NUMBER_ID}}/messages",
+        "jsonParameters": true,
+        "responseFormat": "json",
+        "options": { "redirect": { "followRedirects": true } },
+        "headerParametersJson": "{\n  \"Authorization\": \"Bearer {{$json.TOKEN}}\",\n  \"Content-Type\": \"application/json\"\n}",
+        "bodyParametersJson": "{\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"={{$json.phone}}\",\n  \"type\": \"text\",\n  \"text\": { \"body\": \"={{$json.text}}\" }\n}"
+      },
+      "id": "HTTP_WABA",
+      "name": "HTTP Request - WhatsApp Cloud",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [140, 0]
+    }
+  ],
+  "connections": {
+    "Webhook - send-whatsapp": { "main": [[{ "node": "Code - split phones", "type": "main", "index": 0 }]] },
+    "Code - split phones": { "main": [[{ "node": "Set Config (PHONE_NUMBER_ID/TOKEN)", "type": "main", "index": 0 }]] },
+    "Set Config (PHONE_NUMBER_ID/TOKEN)": { "main": [[{ "node": "HTTP Request - WhatsApp Cloud", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "timezone": "America/Belem" }
+}

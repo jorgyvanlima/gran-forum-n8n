@@ -1,0 +1,38 @@
+{
+  "name": "Jobs Sync (Adzuna + Jooble → /api/jobs/import)",
+  "nodes": [
+    { "parameters": { "triggerTimes": { "item": [ { "hour": 5 } ] } }, "id": "Cron", "name": "Cron (diário 05:00)", "type": "n8n-nodes-base.cron", "typeVersion": 1, "position": [-920, 0] },
+    { "parameters": { "keepOnlySet": true, "values": { "string": [
+      { "name": "adzuna_app_id", "value": "SEU_ADZUNA_APP_ID" },
+      { "name": "adzuna_app_key", "value": "SEU_ADZUNA_APP_KEY" },
+      { "name": "jooble_key", "value": "SEU_JOOBLE_KEY" },
+      { "name": "keywords", "value": "Python, Estágio, Análise de Dados" },
+      { "name": "location", "value": "Belém, PA" },
+      { "name": "country", "value": "br" }
+    ]}}, "id": "Set_Config_Jobs", "name": "Set Config (Adzuna/Jooble/Busca)", "type": "n8n-nodes-base.set", "typeVersion": 2, "position": [-680, 0] },
+    { "parameters": { "method": "GET", "url": "={{`https://api.adzuna.com/v1/api/jobs/${$json.country}/search/1?app_id=${$json.adzuna_app_id}&app_key=${$json.adzuna_app_key}&results_per_page=50&what=${encodeURIComponent($json.keywords)}&where=${encodeURIComponent($json.location)}`}}", "jsonParameters": true, "responseFormat": "json", "options": { "redirect": { "followRedirects": true } } }, "id": "HTTP_Adzuna", "name": "HTTP Request - Adzuna", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4, "position": [-440, -120] },
+    { "parameters": { "functionCode": "const res = items[0].json || {};\nconst arr = Array.isArray(res.results) ? res.results : [];\nreturn arr.map(r => ({ json: { title: r.title || '', company: (r.company && r.company.display_name) ? r.company.display_name : undefined, location: (r.location && r.location.display_name) ? r.location.display_name : undefined, source: 'adzuna', url: r.redirect_url || '', publishedAt: r.created || r.created_at || undefined, tags: (r.category && r.category.label) ? r.category.label : undefined } }));\n" }, "id": "Fn_Map_Adzuna", "name": "Code - map Adzuna → padrão", "type": "n8n-nodes-base.function", "typeVersion": 1, "position": [-200, -120] },
+    { "parameters": { "method": "POST", "url": "={{`https://jooble.org/api/${$json.jooble_key}`}}", "jsonParameters": true, "responseFormat": "json", "options": { "redirect": { "followRedirects": true }, "timeout": 30000 }, "bodyParametersJson": "{\n  \"keywords\": \"={{$json.keywords}}\",\n  \"location\": \"={{$json.location}}\",\n  \"page\": 1,\n  \"size\": 50\n}" }, "id": "HTTP_Jooble", "name": "HTTP Request - Jooble", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4, "position": [-440, 140] },
+    { "parameters": { "functionCode": "const res = items[0].json || {};\nconst arr = Array.isArray(res.jobs) ? res.jobs : [];\nreturn arr.map(r => ({ json: { title: r.title || '', company: r.company || undefined, location: r.location || undefined, source: 'jooble', url: r.link || '', publishedAt: r.updated || r.date || undefined, tags: (r.type || '') } }));\n" }, "id": "Fn_Map_Jooble", "name": "Code - map Jooble → padrão", "type": "n8n-nodes-base.function", "typeVersion": 1, "position": [-200, 140] },
+    { "parameters": { "mode": "append" }, "id": "Merge_Concat", "name": "Merge (append)", "type": "n8n-nodes-base.merge", "typeVersion": 2, "position": [40, 10] },
+    { "parameters": { "functionCode": "const all = items.map(i => i.json);\nreturn [{ json: { items: all } }];\n" }, "id": "Fn_Aggregate", "name": "Code - aggregate → {items:[...] }", "type": "n8n-nodes-base.function", "typeVersion": 1, "position": [280, 10] },
+    { "parameters": { "method": "POST", "url": "http://127.0.0.1:3001/api/jobs/import", "jsonParameters": true, "responseFormat": "json", "options": {}, "bodyParametersJson": "={{JSON.stringify($json)}}" }, "id": "HTTP_Import", "name": "HTTP Request - Backend /api/jobs/import", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4, "position": [520, 10] }
+  ],
+  "connections": {
+    "Cron (diário 05:00)": { "main": [[{ "node": "Set Config (Adzuna/Jooble/Busca)", "type": "main", "index": 0 }]] },
+    "Set Config (Adzuna/Jooble/Busca)": {
+      "main": [
+        [{ "node": "HTTP Request - Adzuna", "type": "main", "index": 0 }],
+        [{ "node": "HTTP Request - Jooble", "type": "main", "index": 0 }]
+      ]
+    },
+    "HTTP Request - Adzuna": { "main": [[{ "node": "Code - map Adzuna → padrão", "type": "main", "index": 0 }]] },
+    "HTTP Request - Jooble": { "main": [[{ "node": "Code - map Jooble → padrão", "type": "main", "index": 0 }]] },
+    "Code - map Adzuna → padrão": { "main": [[{ "node": "Merge (append)", "type": "main", "index": 0 }]] },
+    "Code - map Jooble → padrão": { "main": [[{ "node": "Merge (append)", "type": "main", "index": 1 }]] },
+    "Merge (append)": { "main": [[{ "node": "Code - aggregate → {items:[...] }", "type": "main", "index": 0 }]] },
+    "Code - aggregate → {items:[...] }": { "main": [[{ "node": "HTTP Request - Backend /api/jobs/import", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "timezone": "America/Belem" }
+}
